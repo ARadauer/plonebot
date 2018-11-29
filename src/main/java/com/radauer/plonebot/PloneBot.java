@@ -1,59 +1,39 @@
 package com.radauer.plonebot;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import javax.swing.JOptionPane;
-
 import org.apache.commons.lang3.StringUtils;
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.NoSuchElementException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.support.ui.ExpectedCondition;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.FluentWait;
-import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class PloneBot
 {
-    private static String baseUrl = "https://nwi-cms-qa.ext.ocp.porscheinformatik.cloud/Plone/";
-    private static String FEATURE_TO_COPY = "Feature Toggles"; // "carconfigurator";
 
+    private static String FEATURE_TO_COPY = "WLTP Settings";
+    private static PloneBotMode MODE = PloneBotMode.QA_COPY;
     private static String[] TOOLS_TO_COPY_TO = {"carconfigurator"}; //{null};
-    private static String TOOL_TO_COPY_FROM =  TOOLS_TO_COPY_TO[0];
+
+    private static String TOOL_TO_COPY_FROM = TOOLS_TO_COPY_TO[0];
     private static String COUNTRY_TO_COPY_FROM = "at";
     private static String BRAND_TO_COPY_FROM = "vw";
-
-    private static boolean INSERT = true;
-    private static boolean DELETE = !INSERT;
-
     private static String[] allCountries =
         {"at", "ba", "bg", "cl", "co", "common", "cz", "hr", "hu", "mk", "my", "ro", "rs", "si", "sk", "ua"};
     private static String[] allBrands = {"vw", "audi", "lnf", "seat", "skoda"};
-    private static WebDriver driver;
+    private static String baseUrlQa = "https://nwi-cms-qa.ext.ocp.porscheinformatik.cloud/Plone/";
+    private static String baseUrlProd = "https://nwi-cms.ext.ocp.porscheinformatik.cloud/Plone/";
+    private static String pnetUrlQa = "https://qa.auto-partner.net/portal/at/menu";
+    private static String pnetUrlProd = "https://qa.auto-partner.net/portal/at/menu";
 
-    FluentWait<WebDriver> fluentWait = new FluentWait<WebDriver>(driver)
-        .withTimeout(2, TimeUnit.SECONDS)
-        .pollingEvery(50, TimeUnit.MILLISECONDS)
-        .ignoring(NoSuchElementException.class);
+    private static PlonePage plonePage;
 
     public static void main(String[] args)
     {
+        plonePage = new PlonePage(new ChromeDriver(), MODE.prod ? pnetUrlProd : pnetUrlQa);
 
-        driver = new ChromeDriver();
-        driver.get("https://qa.auto-partner.net/portal/at/menu");
+        plonePage.logIn();
 
-        logIn();
-
-        //initCountriesAndBrands();
-
-        if (INSERT)
+        if (MODE.copy)
         {
+
             copyFeature();
+
         }
 
         for (String country : allCountries)
@@ -68,199 +48,97 @@ public class PloneBot
                 {
                     continue;
                 }
+
                 for (String tool : TOOLS_TO_COPY_TO)
                 {
-                    System.out.println("Do " + country + " " + brand + " " + tool);
-                   if (country.equals(COUNTRY_TO_COPY_FROM) && brand.equals(BRAND_TO_COPY_FROM) && tool.equals(
-                        TOOL_TO_COPY_FROM))
-                    {
-                        System.out.println(" Skip");
-                        continue;
-                    }
-                    navigateTo(country, brand, tool);
-                    if (driver.findElement(By.className("documentFirstHeading"))
-                        .getText()
-                        .contains("does not seem to exist"))
-                    {
-                        continue;
-                    }
-
-                        boolean found = findFeature(FEATURE_TO_COPY) != null;
-
-                    if (INSERT)
-                    {
-                        if (!found)
-                        {
-                            driver.findElement(By.id("btn-paste")).click();
-                            sleep();
-
-                            System.out.println(" Inserted");
-                            (new WebDriverWait(driver, 10)).until(new ExpectedCondition<Boolean>()
-                            {
-                                public Boolean apply(WebDriver d)
-                                {
-                                    return selectFeature(FEATURE_TO_COPY);
-                                }
-                            });
-                            waitAndClick(By.id("btn-workflow"));
-                            waitAndClick(By.className("applyBtn"));
-                            System.out.println(" published");
-                        }
-                        else
-                        {
-                            System.out.println(" Already exists");
-                        }
-                    }
-                    if (DELETE)
-                    {
-                        if (found)
-                        {
-                            driver.findElement(By.id("btn-delete")).click();
-                            driver.findElement(By.className("applyBtn")).click();
-                            System.out.println(" Deleted");
-                        }
-                        else
-                        {
-                            System.out.println(" Did not exist");
-                        }
-                    }
-
+                    doTask(country, brand, tool);
                 }
+
+
             }
         }
-
-        System.out.println("Page title is: " + driver.getTitle());
+        System.out.println("Fertig");
 
         // driver.quit();
     }
 
-    private static void waitAndClick(By by)
-    {
-        (new WebDriverWait(driver, 5))
-            .until(ExpectedConditions.elementToBeClickable(by)).click();
-    }
-
-    private static void sleep()
+    private static void doTask(String country, String brand, String tool)
     {
         try
         {
-            Thread.sleep(250);
-        }
-        catch (InterruptedException e)
-        {
-            e.printStackTrace();
-        }
-    }
-
-    private static void copyFeature()
-    {
-        navigateTo(COUNTRY_TO_COPY_FROM, BRAND_TO_COPY_FROM, TOOL_TO_COPY_FROM);
-        selectFeature(FEATURE_TO_COPY);
-        driver.findElement(By.id("btn-copy")).click();
-        sleep();
-    }
-
-    private static boolean selectFeature(String featureToSelect)
-    {
-
-        WebElement feature = findFeature(featureToSelect);
-        if (feature != null)
-        {
-            WebElement tableRow = (WebElement) ((JavascriptExecutor) driver)
-                .executeScript("return arguments[0].parentNode.parentNode.parentNode;", feature);
-
-            WebElement firstCol = tableRow.findElement(By.className("selection"));
-            WebElement checkbox = firstCol.findElement(By.tagName("input"));
-            checkbox.click();
-
-            try
+            System.out.println("Do " + country + " " + brand + " " + tool);
+            if (country.equals(COUNTRY_TO_COPY_FROM) && brand.equals(BRAND_TO_COPY_FROM) && tool.equals(
+                TOOL_TO_COPY_FROM))
             {
-                Thread.sleep(50);
+                System.out.println(" Skip");
+                return;
             }
-            catch (InterruptedException e)
+            navigateTo(country, brand, tool);
+            if (plonePage.siteDoesNotExist())
             {
-                e.printStackTrace();
+                return;
             }
-            return true;
-        }
-        return false;
 
-    }
+            boolean found = plonePage.findFeature(FEATURE_TO_COPY) != null;
 
-    private static WebElement findFeature(String featureToSelect)
-    {
-        try
-        {
-            List<WebElement> features = driver.findElements(By.className("manage"));
-
-            for (WebElement feature : features)
+            if (MODE.copy)
             {
 
-                if (feature.getText().equals(featureToSelect))
+                if (!found)
                 {
-                    return feature;
-
+                    insertFeature();
+                }
+                else
+                {
+                    System.out.println(" Already exists");
+                }
+            }
+            if (!MODE.copy) //delete
+            {
+                if (found)
+                {
+                    deleteFeature();
+                }
+                else
+                {
+                    System.out.println(" Did not exist");
                 }
             }
         }
         catch (Exception e)
         {
-            System.out.println(e.getLocalizedMessage());
+            e.printStackTrace();
+            System.out.println("Fehler");
         }
 
-        return null;
     }
 
-   /* private static void initCountriesAndBrands()
+    private static void deleteFeature()
     {
-        navigateTo();
-        List<WebElement> countries = driver.findElements(By.className("contenttype-country"));
-        for (WebElement country : countries)
-        {
-            System.out.println("Country: " + country.getText());
-            allCountries.add(country.getText());
-        }
+        plonePage.selectFeature(FEATURE_TO_COPY);
+        plonePage.delete();
+        System.out.println(" Deleted");
+    }
 
-        navigateTo(COUNTRY_TO_COPY_FROM);
-        List<WebElement> brands = driver.findElements(By.className("contenttype-brand"));
-
-        for (WebElement brand : brands)
-        {
-            System.out.println("Brand: " + brand.getText());
-            allBrands.add(brand.getText());
-        }
-
-        navigateTo("at", "vw");
-
-        List<WebElement> tools = driver.findElements(By.className("contenttype-tool"));
-
-        for (WebElement tool : tools)
-        {
-            System.out.println("Tool: " + tool.getText());
-        }
-    }*/
-
-    private static void logIn()
+    private static void insertFeature()
     {
-        JOptionPane.showMessageDialog(null, "Eingeloggt und Plone gestartet?");
+        plonePage.pasteAndSelect(FEATURE_TO_COPY);
+        System.out.println(" Inserted");
+        plonePage.publish();
+        System.out.println(" published");
 
-        System.out.println("Logged in");
-        for (String handle : driver.getWindowHandles())
-        {
-            System.out.println("Windows " + handle);
-            driver.switchTo().window(handle);
-            System.out.println("Page title is: " + driver.getTitle());
-            if (driver.getTitle().contains("Plone"))
-            {
-                break;
-            }
+    }
 
-        }
+    private static void copyFeature()
+    {
+        navigateTo(COUNTRY_TO_COPY_FROM, BRAND_TO_COPY_FROM, TOOL_TO_COPY_FROM);
+        plonePage.selectFeature(FEATURE_TO_COPY);
+        plonePage.copy();
     }
 
     private static String getFolderUrl(String... path)
     {
-        String url = baseUrl;
+        String url = MODE.prod ? baseUrlProd : baseUrlQa;
         for (String p : path)
         {
             if (p == null)
@@ -277,14 +155,6 @@ public class PloneBot
     {
         String url = getFolderUrl(paths);
         System.out.println("Navigate to " + url);
-        driver.navigate().to(url);
-        try
-        {
-            Thread.sleep(100);
-        }
-        catch (InterruptedException e)
-        {
-            e.printStackTrace();
-        }
+        plonePage.goToUrl(url);
     }
 }
