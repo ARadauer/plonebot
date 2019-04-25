@@ -6,26 +6,26 @@ import org.openqa.selenium.chrome.ChromeDriver;
 public class PloneBot
 {
 
-    private static String FEATURE_TO_COPY = "WLTP Settings";
-    private static PloneBotMode MODE = PloneBotMode.QA_COPY;
+    private static String FEATURE_TO_COPY = "CC Model Groups";
+    private static PloneBotMode MODE = PloneBotMode.PROD_CHECK_EXISTANCE;
     private static String[] TOOLS_TO_COPY_TO = {"carconfigurator"}; //{null};
 
     private static String TOOL_TO_COPY_FROM = TOOLS_TO_COPY_TO[0];
     private static String COUNTRY_TO_COPY_FROM = "at";
-    private static String BRAND_TO_COPY_FROM = "vw";
+    private static String BRAND_TO_COPY_FROM = "audi";
     private static String[] allCountries =
         {"at", "ba", "bg", "cl", "co", "common", "cz", "hr", "hu", "mk", "my", "ro", "rs", "si", "sk", "ua"};
     private static String[] allBrands = {"vw", "audi", "lnf", "seat", "skoda"};
     private static String baseUrlQa = "https://nwi-cms-qa.ext.ocp.porscheinformatik.cloud/Plone/";
-    private static String baseUrlProd = "https://nwi-cms.ext.ocp.porscheinformatik.cloud/Plone/";
-    private static String pnetUrlQa = "https://qa.auto-partner.net/portal/at/menu";
-    private static String pnetUrlProd = "https://qa.auto-partner.net/portal/at/menu";
+    private static String baseUrlProd = "https://nwi-cms-prod.ext.ocp.porscheinformatik.cloud/Plone/";
+    /*private static String pnetUrlQa = "https://nwi-cms-qa.ext.ocp.porscheinformatik.cloud/Plone";
+    private static String pnetUrlProd = "https://nwi-cms.ext.ocp.porscheinformatik.cloud/Plone/";*/
 
     private static PlonePage plonePage;
 
     public static void main(String[] args)
     {
-        plonePage = new PlonePage(new ChromeDriver(), MODE.prod ? pnetUrlProd : pnetUrlQa);
+        plonePage = new PlonePage(new ChromeDriver(), MODE.prod ? baseUrlProd : baseUrlQa);
 
         plonePage.logIn();
 
@@ -66,7 +66,18 @@ public class PloneBot
     {
         try
         {
+
             System.out.println("Do " + country + " " + brand + " " + tool);
+            if (MODE.checkExistence)
+            {
+                navigateTo(country, brand, tool, FEATURE_TO_COPY.toLowerCase().replace(" ", "_"));
+
+                System.out.println(plonePage.siteDoesNotExist() ? "MISSING" : "OK");
+                return;
+            }
+
+
+
             if (country.equals(COUNTRY_TO_COPY_FROM) && brand.equals(BRAND_TO_COPY_FROM) && tool.equals(
                 TOOL_TO_COPY_FROM))
             {
@@ -124,8 +135,8 @@ public class PloneBot
     {
         plonePage.pasteAndSelect(FEATURE_TO_COPY);
         System.out.println(" Inserted");
-        plonePage.publish();
-        System.out.println(" published");
+        //plonePage.publish();
+        //System.out.println(" published");
 
     }
 
